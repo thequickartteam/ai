@@ -9,8 +9,8 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free AI Mode Search (Puter.js)</title>
-    <script src="https://puter.com"></script>
+    <title>Free AI Search (No API Key)</title>
+    <script src="https://puter.com" defer></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -80,20 +80,16 @@ HTML_TEMPLATE = """
 
     <div class="controls">
         <select id="modelSelect" title="Choose AI Model">
-            <optgroup label="Google Gemini">
-                <option value="google/gemini-2.5-flash" selected>Gemini 2.5 Flash (Fast & Free)</option>
-                <option value="google/gemini-2.5-pro">Gemini 2.5 Pro</option>
-                <option value="google/gemini-4-hydrogen">Gemini 4 Hydrogen</option>
+            <optgroup label="Direct Free API (No Login / Never Blocked)">
+                <option value="pollinations:openai" selected>Pollinations GPT (Instant & Keyless)</option>
+                <option value="pollinations:gemini">Pollinations Gemini (Instant & Keyless)</option>
+                <option value="pollinations:searchgpt">Pollinations SearchGPT (Web Search)</option>
             </optgroup>
-            <optgroup label="OpenAI GPT">
-                <option value="gpt-5-nano">GPT-5 Nano (Fast)</option>
-                <option value="gpt-5-mini">GPT-5 Mini</option>
-                <option value="gpt-4o-mini">GPT-4o Mini</option>
-            </optgroup>
-            <optgroup label="Open Models & Others">
-                <option value="deepseek-chat">DeepSeek Chat</option>
-                <option value="meta-llama/llama-4-maverick">Llama 4 Maverick</option>
-                <option value="claude-sonnet-4">Claude Sonnet 4</option>
+            <optgroup label="Puter.js Models (Requires Puter Pop-up)">
+                <option value="puter:google/gemini-2.5-flash">Puter: Gemini 2.5 Flash</option>
+                <option value="puter:google/gemini-2.5-pro">Puter: Gemini 2.5 Pro</option>
+                <option value="puter:gpt-5-nano">Puter: GPT-5 Nano</option>
+                <option value="puter:deepseek-chat">Puter: DeepSeek Chat</option>
             </optgroup>
         </select>
 
@@ -120,26 +116,52 @@ HTML_TEMPLATE = """
 
         async function askAI() {
             const prompt = queryInput.value.trim();
-            const selectedModel = modelSelect.value;
+            const selection = modelSelect.value;
 
             if (!prompt) return;
 
             searchBtn.disabled = true;
-            statusDiv.textContent = `Generating response with ${selectedModel}...`;
             resultBox.style.display = "block";
             resultBox.textContent = "";
 
             try {
-                const response = await puter.ai.chat(prompt, {
-                    model: selectedModel,
-                    stream: true
-                });
+                if (selection.startsWith("pollinations:")) {
+                    const modelName = selection.split(":")[1];
+                    statusDiv.textContent = `Fetching response (${modelName})...`;
 
-                statusDiv.textContent = `Model: ${selectedModel}`;
+                    const res = await fetch("https://pollinations.ai", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            messages: [{ role: "user", content: prompt }],
+                            model: modelName
+                        })
+                    });
 
-                for await (const part of response) {
-                    if (part?.text) {
-                        resultBox.textContent += part.text;
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const text = await res.text();
+                    statusDiv.textContent = `Provider: Pollinations (${modelName})`;
+                    resultBox.textContent = text;
+
+                } else if (selection.startsWith("puter:")) {
+                    if (typeof window.puter === "undefined") {
+                        throw new Error("Puter.js script was blocked by your browser/ad-blocker or failed to load. Disable ad-blocker for this page or use a Pollinations model from the dropdown.");
+                    }
+
+                    const modelName = selection.split(":")[1];
+                    statusDiv.textContent = `Generating response with ${modelName}...`;
+
+                    const response = await window.puter.ai.chat(prompt, {
+                        model: modelName,
+                        stream: true
+                    });
+
+                    statusDiv.textContent = `Provider: Puter (${modelName})`;
+
+                    for await (const part of response) {
+                        if (part?.text) {
+                            resultBox.textContent += part.text;
+                        }
                     }
                 }
             } catch (err) {
